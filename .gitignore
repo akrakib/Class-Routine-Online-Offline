@@ -1,16 +1,33 @@
+# Dependencies & Build artifacts
 node_modules/
+backend/node_modules/
+.gradle/
 android/.gradle/
 android/build/
 android/app/build/
-android/local.properties
 android/capacitor-cordova-android-plugins/
+
+# Environment & Credentials / Privacy
+.env
+*.env
+.dev.vars
+backend/.dev.vars
+admin/
+admin-user.sql
+backend/admin-user.sql
+backups/
+
+# Local & IDE settings
+local.properties
+android/local.properties
+.idea/
+.vscode/
+
+# Signing keys & Certificates
 *.jks
 *.keystore
-.idea/
+*.pem
+*.key
 
-# Class Routine 2.0
-admin-user.sql
-.dev.vars
+# Wrangler cache
 .wrangler/
-backend/node_modules/
-backend/admin-user.sql
