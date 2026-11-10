@@ -1,0 +1,12 @@
+{
+  "name": "class-routine-worker",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply class-routine-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply class-routine-db --remote"
+  },
+  "devDependencies": { "wrangler": "^4.45.0" }
+}

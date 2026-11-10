@@ -1,0 +1,21 @@
+name = "class-routine-api"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[assets]
+directory = "../admin"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "class-routine-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+APP_ORIGIN = "https://REPLACE_WITH_WORKER_HOST"
+ALLOWED_ORIGINS = "https://localhost,http://localhost,capacitor://localhost"
+SESSION_TTL_HOURS = "12"

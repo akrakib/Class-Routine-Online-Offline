@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Class Routine Admin</title>
+<style>
+:root{--bg:#f2f4f3;--card:#fff;--ink:#1c2b2a;--mute:#66767a;--line:#d9dfdd;--pri:#0e5a52;--pri-ink:#fff;--warn:#b4561b;--bad:#a52a2a;--ok:#1d7a4d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,"Segoe UI","Noto Sans Bengali",sans-serif}
+[hidden]{display:none!important}
+h2{font-size:1.25rem;margin:0 0 12px}
+h3{font-size:.95rem;margin:18px 0 6px;color:var(--mute);font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#fff}
+textarea{min-height:80px;resize:vertical}
+label{display:block;font-weight:600;font-size:.85rem;margin-bottom:10px}
+label input,label select,label textarea{margin-top:4px;font-weight:400}
+label.chk{display:flex;gap:8px;align-items:center;font-weight:500}
+label.chk input{width:auto;margin:0}
+button{border:1px solid var(--line);background:#fff;padding:8px 14px;border-radius:6px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+.pri{background:var(--pri);color:var(--pri-ink);border-color:var(--pri)}
+.danger{color:var(--bad);border-color:#e3c2c2}
+.ghost{background:transparent}
+#login{max-width:340px;margin:12vh auto;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+#login h1{font-size:1.3rem;margin:0 0 16px}
+header{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--pri);color:#fff;flex-wrap:wrap}
+header b{font-size:1.05rem}
+header button{background:transparent;color:#fff;border-color:#ffffff66;margin-left:auto}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;color:#ffffffcc;border:0;border-radius:6px;padding:6px 12px}
+nav button.on{background:#fff;color:var(--pri);font-weight:600}
+main{max-width:860px;margin:0 auto;padding:18px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0 14px}
+.grid .full{grid-column:1/-1}
+.row,.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar{margin-bottom:14px}
+.bar select{width:auto;flex:1;min-width:200px}
+.item{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+.item>div{flex:1;min-width:0}
+.item small{display:block;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.time{font-variant-numeric:tabular-nums;color:var(--mute);min-width:96px}
+.tag{font-size:.75rem;padding:2px 8px;border-radius:99px;background:#f6e6d8;color:var(--warn)}
+.tag.on{background:#d9efe3;color:var(--ok)}
+.empty{color:var(--mute);padding:16px 0}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);padding:10px 16px;border-radius:8px;background:var(--ink);color:#fff;max-width:90vw;z-index:9}
+#toast.err{background:var(--bad)}
+@media(max-width:560px){.item{flex-wrap:wrap}.time{min-width:100%}}
+@media(prefers-reduced-motion:no-preference){#toast{transition:opacity .2s}}
+</style>
+</head>
+<body>
+
+<form id="login" hidden>
+  <h1>Class Routine Admin</h1>
+  <label>Username<input name="u" autocomplete="username" required></label>
+  <label>Password<input name="p" type="password" autocomplete="current-password" required></label>
+  <button class="pri" style="width:100%">Log in</button>
+</form>
+
+<div id="app" hidden>
+  <header><b>Class Routine</b><nav id="nav"></nav><button id="out">Log out</button></header>
+  <main id="view"></main>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+// Paste your Worker URL here if it ever changes.
+const API = 'https://class-routine-api.viraltime123123.workers.dev';
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tok = () => sessionStorage.getItem('cr_token');
+
+let tt;
+function toast(msg, err) {
+  const t = $('#toast');
+  t.textContent = msg; t.className = err ? 'err' : ''; t.hidden = false;
+  clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3500);
+}
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(API + path, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(tok() ? { Authorization: 'Bearer ' + tok() } : {}) },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const d = await r.json().catch(() => ({ message: 'Unexpected server response' }));
+  if (r.status === 401 && path !== '/api/admin/login') { logout(); throw new Error('Session ended. Log in again.'); }
+  if (!r.ok || d.success === false) throw new Error(d.message || 'Request failed');
+  return d;
+}
+
+// ---------- auth ----------
+function logout() {
+  const t = tok();
+  sessionStorage.removeItem('cr_token');
+  if (t) fetch(API + '/api/admin/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + t } }).catch(() => {});
+  $('#app').hidden = true; $('#login').hidden = false;
+}
+$('#out').onclick = logout;
+
+$('#login').onsubmit = async e => {
+  e.preventDefault();
+  try {
+    const d = await api('/api/admin/login', 'POST', { username: e.target.u.value, password: e.target.p.value });
+    sessionStorage.setItem('cr_token', d.token);
+    e.target.reset();
+    boot();
+  } catch (err) { toast(err.message, 1); }
+};
+
+// ---------- generic list + form (subjects, teachers, rooms, notices, events) ----------
+const RES = {
+  subjects: { label: 'Subjects', fields: [{ n: 'name', l: 'Subject name', t: 'text', req: 1 }] },
+  teachers: { label: 'Teachers', fields: [{ n: 'name', l: 'Teacher name', t: 'text', req: 1 }, { n: 'phone', l: 'Phone', t: 'text' }] },
+  rooms: { label: 'Rooms', fields: [{ n: 'name', l: 'Room number or name', t: 'text', req: 1 }] },
+  announcements: { label: 'Announcements', fields: [
+    { n: 'title', l: 'Title', t: 'text', req: 1 },
+    { n: 'content', l: 'Message', t: 'area', req: 1 },
+    { n: 'is_published', l: 'Show to students', t: 'bool' }] },
+  events: { label: 'Events', fields: [
+    { n: 'title', l: 'Title', t: 'text', req: 1 },
+    { n: 'event_date', l: 'Date', t: 'date', req: 1 },
+    { n: 'description', l: 'Details', t: 'area' },
+    { n: 'is_published', l: 'Show to students', t: 'bool' }] }
+};
+
+const fieldHtml = (f, val) => f.t === 'bool'
+  ? `<label class="chk"><input type="checkbox" name="${f.n}" ${val ? 'checked' : ''}> ${f.l}</label>`
+  : `<label>${f.l}${f.t === 'area'
+      ? `<textarea name="${f.n}" ${f.req ? 'required' : ''}>${esc(val)}</textarea>`
+      : `<input name="${f.n}" type="${f.t === 'date' ? 'date' : 'text'}" value="${esc(val)}" ${f.req ? 'required' : ''}>`}</label>`;
+
+async function viewRes(key) {
+  const R = RES[key], v = $('#view');
+  let items = [], editId = null;
+
+  const load = async () => { items = (await api('/api/admin/' + key)).items; draw(); };
+
+  const rowHtml = x => `<div class="item"><div><b>${esc(x[R.fields[0].n])}</b>
+    <small>${esc(R.fields.slice(1).filter(f => f.t !== 'bool' && x[f.n]).map(f => x[f.n]).join(', '))}</small></div>
+    ${'is_published' in x ? `<span class="tag ${x.is_published ? 'on' : ''}">${x.is_published ? 'Published' : 'Draft'}</span>` : ''}
+    <button class="ghost" data-e="${x.id}">Edit</button><button class="danger" data-d="${x.id}">Delete</button></div>`;
+
+  function draw() {
+    const cur = items.find(x => x.id === editId) || {};
+    v.innerHTML = `<h2>${R.label}</h2>
+      <form id="f" class="card">${R.fields.map(f => fieldHtml(f, cur[f.n])).join('')}
+        <div class="row"><button class="pri">${editId ? 'Save changes' : 'Add'}</button>
+        ${editId ? '<button type="button" class="ghost" id="cancel">Cancel</button>' : ''}</div></form>
+      ${items.length ? items.map(rowHtml).join('') : '<p class="empty">Nothing here yet. Use the form above to add the first one.</p>'}`;
+
+    $('#f').onsubmit = async e => {
+      e.preventDefault();
+      const b = {};
+      R.fields.forEach(f => { const el = e.target.elements[f.n]; b[f.n] = f.t === 'bool' ? el.checked : el.value; });
+      try {
+        if (editId) await api(`/api/admin/${key}/${editId}`, 'PUT', b); else await api('/api/admin/' + key, 'POST', b);
+        toast(editId ? 'Saved' : 'Added'); editId = null; await load();
+      } catch (err) { toast(err.message, 1); }
+    };
+    if (editId) $('#cancel').onclick = () => { editId = null; draw(); };
+    v.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { editId = +b.dataset.e; draw(); scrollTo(0, 0); });
+    v.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this item?')) return;
+      try { await api(`/api/admin/${key}/${b.dataset.d}`, 'DELETE'); toast('Deleted'); editId = null; await load(); }
+      catch (err) { toast(err.message, 1); }
+    });
+  }
+  await load();
+}
+
+// ---------- routine ----------
+let gid = null;
+
+async function viewRoutine() {
+  const v = $('#view');
+  const [gs, ss, sub, te, ro] = await Promise.all(
+    ['groups', 'semesters', 'subjects', 'teachers', 'rooms'].map(k => api('/api/admin/' + k)));
+  const groups = gs.items.map(g => ({ ...g,
+    label: `${(ss.items.find(s => s.id === g.semester_id) || {}).name || ''}, Group ${g.name}` }));
+
+  if (!groups.length) { v.innerHTML = '<p class="empty">No groups found. Add a semester and its groups in the database first.</p>'; return; }
+  if (!groups.some(g => g.id === gid)) gid = groups[0].id;
+
+  let rows = [], editId = null;
+  const opt = (a, sel, blank) => (blank ? '<option value="">None</option>' : '') +
+    a.map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+
+  const load = async () => { rows = (await api('/api/admin/routines?group_id=' + gid)).routines; draw(); };
+
+  function draw() {
+    const c = rows.find(r => r.id === editId) || {};
+    const drafts = rows.filter(r => !r.is_published).length;
+    const byDay = DAYS.map(d => [d, rows.filter(r => r.day === d)]).filter(x => x[1].length);
+
+    v.innerHTML = `<h2>Routine</h2>
+      <div class="bar"><select id="g" aria-label="Group">${groups.map(g => `<option value="${g.id}" ${g.id === gid ? 'selected' : ''}>${esc(g.label)}</option>`).join('')}</select>
+        <button class="pri" id="pub" ${drafts ? '' : 'disabled'}>Publish ${drafts} draft${drafts === 1 ? '' : 's'}</button></div>
+      ${sub.items.length ? '' : '<p class="empty">Add at least one subject first (Subjects tab).</p>'}
+      <form id="f" class="card"><div class="grid">
+        <label>Subject<select name="subject_id" required>${opt(sub.items, c.subject_id)}</select></label>
+        <label>Teacher<select name="teacher_id">${opt(te.items, c.teacher_id, 1)}</select></label>
+        <label>Room<select name="room_id">${opt(ro.items, c.room_id, 1)}</select></label>
+        <label>Day<select name="day">${DAYS.map(d => `<option ${d === (c.day || 'Sunday') ? 'selected' : ''}>${d}</option>`).join('')}</select></label>
+        <label>Start<input type="time" name="start_time" value="${esc(c.start_time || '')}" required></label>
+        <label>End<input type="time" name="end_time" value="${esc(c.end_time || '')}" required></label>
+        <label class="chk full"><input type="checkbox" name="is_published" ${c.is_published ? 'checked' : ''}> Show to students now</label></div>
+        <div class="row"><button class="pri">${editId ? 'Save changes' : 'Add class'}</button>
+        ${editId ? '<button type="button" class="ghost" id="cancel">Cancel</button>' : ''}</div></form>
+      ${byDay.length ? byDay.map(([d, list]) => `<h3>${d}</h3>` + list.map(r => `<div class="item">
+          <span class="time">${esc(r.start_time)} to ${esc(r.end_time)}</span>
+          <div><b>${esc(r.subject_name || 'No subject')}</b><small>${esc([r.teacher_name, r.room_name && 'Room ' + r.room_name].filter(Boolean).join(', '))}</small></div>
+          <span class="tag ${r.is_published ? 'on' : ''}">${r.is_published ? 'Published' : 'Draft'}</span>
+          <button class="ghost" data-e="${r.id}">Edit</button><button class="danger" data-d="${r.id}">Delete</button></div>`).join('')).join('')
+        : '<p class="empty">No classes for this group yet. Add the first class above.</p>'}`;
+
+    $('#g').onchange = e => { gid = +e.target.value; editId = null; load().catch(err => toast(err.message, 1)); };
+    $('#pub').onclick = async () => {
+      try { const d = await api('/api/admin/publish', 'POST', { group_id: gid });
+        toast(`Published ${d.published_count} class${d.published_count === 1 ? '' : 'es'}`); await load(); }
+      catch (err) { toast(err.message, 1); }
+    };
+    $('#f').onsubmit = async e => {
+      e.preventDefault();
+      const f = e.target.elements;
+      const b = { group_id: gid, subject_id: +f.subject_id.value,
+        teacher_id: f.teacher_id.value || null, room_id: f.room_id.value || null,
+        day: f.day.value, start_time: f.start_time.value, end_time: f.end_time.value,
+        is_published: f.is_published.checked };
+      try {
+        if (editId) await api('/api/admin/routines/' + editId, 'PUT', b); else await api('/api/admin/routines', 'POST', b);
+        toast(editId ? 'Saved' : 'Class added'); editId = null; await load();
+      } catch (err) { toast(err.message, 1); }
+    };
+    if (editId) $('#cancel').onclick = () => { editId = null; draw(); };
+    v.querySelectorAll('[data-e]').forEach(b => b.onclick = () => { editId = +b.dataset.e; draw(); scrollTo(0, 0); });
+    v.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+      if (!confirm('Delete this class?')) return;
+      try { await api('/api/admin/routines/' + b.dataset.d, 'DELETE'); toast('Deleted'); editId = null; await load(); }
+      catch (err) { toast(err.message, 1); }
+    });
+  }
+  await load();
+}
+
+// ---------- navigation ----------
+const TABS = [['routine', 'Routine', viewRoutine],
+  ...Object.keys(RES).map(k => [k, RES[k].label, () => viewRes(k)])];
+
+function show(key) {
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.k === key));
+  const t = TABS.find(x => x[0] === key);
+  $('#view').innerHTML = '<p class="empty">Loading...</p>';
+  t[2]().catch(err => { $('#view').innerHTML = `<p class="empty">${esc(err.message)}</p>`; });
+}
+
+async function boot() {
+  if (!tok()) { $('#login').hidden = false; return; }
+  try { await api('/api/admin/me'); } catch { $('#login').hidden = false; return; }
+  $('#login').hidden = true; $('#app').hidden = false;
+  $('#nav').innerHTML = TABS.map(t => `<button data-k="${t[0]}">${t[1]}</button>`).join('');
+  document.querySelectorAll('#nav button').forEach(b => b.onclick = () => show(b.dataset.k));
+  show('routine');
+}
+boot();
+</script>
+</body>
+</html>

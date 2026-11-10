@@ -1,0 +1,9 @@
+{
+  "appId": "com.akabir.classroutine",
+  "appName": "Class Routine",
+  "webDir": "www",
+  "backgroundColor": "#ffffff",
+  "android": {
+    "backgroundColor": "#ffffff"
+  }
+}

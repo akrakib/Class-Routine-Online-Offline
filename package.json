@@ -1,0 +1,21 @@
+{
+  "name": "class-routine",
+  "version": "2.0.0",
+  "description": "Class Routine 2.0 \u2014 4th Semester Group A and B",
+  "author": "A Kabir",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/preferences": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}
